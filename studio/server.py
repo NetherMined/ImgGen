@@ -570,6 +570,15 @@ class Handler(BaseHTTPRequestHandler):
                 wf = fill_template(wfid, params)
             except Exception as e:
                 return self._json({"error": str(e)}, 400)
+            # free stale models first so this run gets the full VRAM budget
+            try:
+                freq = urllib.request.Request(COMFY + "/free",
+                                              data=b'{"unload_models": true, "free_memory": true}',
+                                              headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(freq, timeout=15) as fr:
+                    fr.read(64)
+            except (urllib.error.URLError, OSError):
+                pass
             payload = json.dumps({"prompt": wf}).encode()
             req = urllib.request.Request(COMFY + "/prompt", data=payload,
                                          headers={"Content-Type": "application/json"})
@@ -606,6 +615,37 @@ class Handler(BaseHTTPRequestHandler):
             items = items[-200:]
             save_gallery(items)
             return self._json({"ok": True})
+        if self.path == "/api/gallery/delete":
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+            except (TypeError, ValueError):
+                return self._json({"error": "bad content length"}, 400)
+            if length > GALLERY_MAX_BODY:
+                return self._json({"error": "too large"}, 413)
+            raw = self.rfile.read(length) if length else b"{}"
+            try:
+                body = json.loads(raw.decode() or "{}")
+            except Exception:
+                return self._json({"error": "invalid json"}, 400)
+            fname = str(body.get("file") or "")
+            name = os.path.basename(fname)
+            if not name or name != fname:
+                return self._json({"error": "bad file name"}, 400)
+            items = load_gallery()
+            kept = [it for it in items if it.get("file") != name]
+            removed = len(items) - len(kept)
+            if not removed:
+                return self._json({"error": "not in gallery", "removed": 0}, 404)
+            save_gallery(kept)
+            deleted_file = False
+            try:
+                fpath = os.path.join(OUTPUT_DIR, name)
+                if os.path.isfile(fpath):
+                    os.remove(fpath)
+                    deleted_file = True
+            except OSError:
+                pass
+            return self._json({"ok": True, "removed": removed, "deleted_file": deleted_file})
         return self._json({"error": "not found"}, 404)
 
     def log_message(self, *a):

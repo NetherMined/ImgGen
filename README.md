@@ -40,7 +40,7 @@ its input/output folders contain personal media. Both are intentionally gitignor
 
 ## Notes
 
-- First run of a workflow is slower (models load into VRAM).
+- First run of a workflow is slower (models load into VRAM); the Studio frees ComfyUI's cached models before every run so the new workflow gets the full VRAM budget.
 - 8GB VRAM: keep LTX-Video at ≤97 frames and AnimateDiff at ≤16 frames.
 - The ReActor NSFW-filter patch in `custom_nodes\ComfyUI-ReActor\nodes.py` must be
   re-applied after any ReActor update.

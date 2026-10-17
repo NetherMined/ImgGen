@@ -63,7 +63,7 @@
   .result-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
   .result-actions button, .g-actions button { background: #2a2e36; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
   .result-actions button:hover, .g-actions button:hover { border-color: var(--accent); }
-  .g-actions { display: flex; gap: 4px; margin-top: 4px; width: 100%; justify-content: center; }
+  .g-actions { display: flex; gap: 4px; margin-top: 4px; width: 100%; justify-content: center; flex-wrap: wrap; }
   .kbd { font-size: 11px; color: var(--muted); margin-left: 8px; }
 </style>
 </head>
@@ -583,6 +583,32 @@ function loadGallery() {
         cBtn.onclick = function (e) { e.stopPropagation(); stageAsCleanup(item.file); };
         actions.appendChild(cBtn);
       }
+      var dlBtn = document.createElement("button");
+      dlBtn.textContent = "Download";
+      dlBtn.onclick = function (e) {
+        e.stopPropagation();
+        var a = document.createElement("a");
+        a.href = "/outputs/" + encodeURIComponent(item.file);
+        a.download = item.file;
+        a.click();
+      };
+      actions.appendChild(dlBtn);
+      var delBtn = document.createElement("button");
+      delBtn.textContent = "Delete";
+      delBtn.onclick = function (e) {
+        e.stopPropagation();
+        if (!confirm("Delete '" + item.file + "' from the gallery and the output folder?")) return;
+        fetch("/api/gallery/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: item.file })
+        }).then(r => r.ok ? r.json() : Promise.reject()).then(function () {
+          loadGallery();
+        }).catch(function () {
+          document.getElementById("statusLine").textContent = "Delete failed";
+        });
+      };
+      actions.appendChild(delBtn);
       g.appendChild(actions);
       g.onclick = function () {
         selectWorkflow(item.workflow);
