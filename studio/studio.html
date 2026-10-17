@@ -1,1 +1,602 @@
-CONTENT_WILL_BE_REPLACED
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ImGen Studio</title>
+<style>
+  :root {
+    --bg: #0c0d10;
+    --panel: #16181d;
+    --card: #1e2128;
+    --border: #2a2e36;
+    --accent: #6c5ce7;
+    --accent-hover: #7d6ef0;
+    --text: #f0f2f5;
+    --muted: #9aa0aa;
+    --success: #00d26a;
+    --danger: #ff4757;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
+  header { padding: 16px 24px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 20px; font-weight: 600; margin: 0; }
+  .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--success); }
+  .status-dot.bad { background: var(--danger); }
+  #errbar { display: none; background: var(--danger); color: #fff; text-align: center; padding: 10px; font-size: 14px; }
+  #errbar button { margin-left: 12px; padding: 6px 16px; background: #fff; color: #000; border: none; border-radius: 6px; cursor: pointer; }
+  .layout { display: grid; grid-template-columns: 280px 1fr 340px; gap: 16px; padding: 16px; min-height: calc(100vh - 160px); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); margin: 0 0 12px; }
+  .wf-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .wf-card:hover { border-color: #444; }
+  .wf-card.active { border-color: var(--accent); background: #25203d; }
+  .wf-card b { font-size: 14px; font-weight: 600; }
+  .wf-card p { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 14px 0 6px; font-weight: 500; }
+  textarea, input[type=text], input[type=number], select { width: 100%; background: #0e1014; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px; }
+  textarea { height: 100px; resize: vertical; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row { display: flex; gap: 10px; align-items: center; }
+  .row .val { min-width: 48px; text-align: right; font-size: 13px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .upload { border: 2px dashed #3a3f48; border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); font-size: 13px; margin-top: 6px; background: #12141a; }
+  .upload.filled { border-style: solid; border-color: var(--success); color: #c8f0d8; }
+  .upload.missing { border-color: var(--danger); }
+  .upload button { margin-top: 8px; padding: 6px 14px; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+  .gen-btn { width: 100%; margin-top: 18px; padding: 14px; font-size: 16px; font-weight: 600; background: var(--accent); color: #fff; border: none; border-radius: 10px; cursor: pointer; transition: background 0.15s; }
+  .gen-btn:hover { background: var(--accent-hover); }
+  .gen-btn:disabled { background: #3a3f48; cursor: default; }
+  .progress-wrap { background: #0e1014; border-radius: 10px; padding: 14px; }
+  .bar { height: 8px; background: #2a2e36; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+  .bar > div { height: 100%; width: 0%; background: var(--accent); transition: width 0.4s; }
+  .result { margin-top: 14px; background: #0e1014; border-radius: 10px; min-height: 240px; display: flex; align-items: center; justify-content: center; color: #555; font-size: 13px; overflow: hidden; }
+  .result img, .result video { max-width: 100%; max-height: 480px; border-radius: 8px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin: 0 16px 16px; }
+  .gitem { background: var(--card); border: 1px solid var(--border); border-radius: 10px; min-height: 100px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666; font-size: 11px; cursor: pointer; overflow: hidden; padding: 6px; transition: border-color 0.15s; }
+  .gitem:hover { border-color: var(--accent); }
+  .gitem img, .gitem video { max-width: 100%; max-height: 80px; border-radius: 6px; }
+  .seed-row { display: flex; gap: 8px; }
+  .seed-row input { flex: 1; }
+  .seed-row button { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0 14px; cursor: pointer; font-size: 16px; }
+  .help { font-size: 11px; color: #6b7280; margin-top: 4px; }
+  .uprev img { max-width: 100%; max-height: 120px; border-radius: 6px; margin-bottom: 6px; }
+  .result-actions { display: flex; gap: 8px; margin-top: 10px; justify-content: center; flex-wrap: wrap; }
+  .result-actions button, .g-actions button { background: #2a2e36; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+  .result-actions button:hover, .g-actions button:hover { border-color: var(--accent); }
+  .g-actions { display: flex; gap: 4px; margin-top: 4px; width: 100%; justify-content: center; }
+  .kbd { font-size: 11px; color: var(--muted); margin-left: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <span class="status-dot" id="dot"></span>
+  <h1>ImGen Studio</h1>
+  <span id="connText" style="color:var(--muted);font-size:13px;margin-left:auto">checking…</span>
+</header>
+<div id="errbar"><span>ComfyUI not reachable — start it, then Retry</span><button id="retryBtn">Retry</button></div>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Workflows</h2>
+    <div id="cards"><div style="color:var(--muted);font-size:13px;padding:8px">Loading…</div></div>
+  </div>
+
+  <div class="panel">
+    <h2 id="formTitle">Settings</h2>
+    <label id="promptLab">Prompt</label>
+    <textarea id="prompt" placeholder="Describe what you want…"></textarea>
+    <div id="uploads"></div>
+    <div id="seedWrap">
+      <label>Seed</label>
+      <div class="seed-row">
+        <input id="seed" type="number" min="0" max="2147483647" value="123456">
+        <button id="dice" title="randomize">🎲</button>
+      </div>
+    </div>
+    <div id="sliders"></div>
+    <button class="gen-btn" id="genBtn">Generate <span class="kbd">Ctrl+Enter</span></button>
+    <button class="gen-btn" id="cleanupBtn" style="background:#2a2e36;margin-top:8px;font-size:14px">Use last result as cleanup</button>
+  </div>
+
+  <div class="panel">
+    <h2>Result</h2>
+    <div class="progress-wrap">
+      <div style="font-size:13px" id="statusLine">Pick a workflow and generate.</div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div style="font-size:12px;color:var(--muted)" id="etaLine"></div>
+    </div>
+    <div class="result" id="result">Result will appear here</div>
+    <div class="result-actions" id="resultActions" style="display:none"></div>
+  </div>
+</div>
+
+<div class="panel" style="margin:0 16px 16px">
+  <h2>Gallery</h2>
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+var workflows = [];
+var selected = null;
+var pollTimer = null;
+var POSES_CACHE = null;
+
+var PLACEHOLDERS = {
+  "01": "describe the new outfit…",
+  "02": "describe the new pose and outfit…",
+  "03": "describe the motion…",
+  "04": "describe the motion…",
+  "05": "describe the couple scene…",
+  "06": "describe the kissing motion…",
+  "07": "describe the whole image…",
+  "09": "describe the outfit and scene…",
+  "10": "describe the full image…",
+  "11": "no prompt needed",
+  "12": "describe the skin/body to paint…",
+  "13": "describe the skin/body…",
+  "14": "describe clean skin for residual areas…"
+};
+
+var ESTIMATES = { "01": 60, "02": 60, "03": 300, "04": 300, "05": 60, "06": 300, "07": 60, "09": 60, "10": 60, "11": 60, "12": 60, "13": 60, "14": 45 };
+
+var SLIDERS = {
+  "01": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.55], ["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.7], ["steps", "Steps", 10, 50, 1, 30]],
+  "02": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.6], ["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.65], ["steps", "Steps", 10, 50, 1, 30]],
+  "03": [["steps", "Steps", 8, 30, 1, 12]],
+  "04": [["steps", "Steps", 10, 40, 1, 25]],
+  "05": [["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.75], ["face_weight_2", "Face weight 2", 0.3, 1.0, 0.05, 0.75], ["steps", "Steps", 10, 50, 1, 30]],
+  "06": [["steps", "Steps", 8, 30, 1, 12]],
+  "07": [["steps", "Steps", 10, 50, 1, 30]],
+  "09": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.6], ["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.65], ["steps", "Steps", 10, 50, 1, 30]],
+  "10": [["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.85], ["steps", "Steps", 10, 50, 1, 30]],
+  "12": [["denoise", "Denoise", 0.4, 1.0, 0.05, 1.0], ["cfg", "CFG", 3.0, 8.0, 0.5, 5.0], ["steps", "Steps", 10, 50, 1, 30]],
+  "13": [["denoise", "Denoise", 0.4, 1.0, 0.05, 1.0], ["cfg", "CFG", 3.0, 8.0, 0.5, 5.0], ["steps", "Steps", 10, 50, 1, 30]],
+  "14": [["denoise", "Denoise", 0.3, 0.7, 0.05, 0.5], ["cfg", "CFG", 3.0, 8.0, 0.5, 5.0], ["steps", "Steps", 10, 40, 1, 25]]
+};
+
+function showBanner() { document.getElementById("errbar").style.display = "block"; }
+function hideBanner() { document.getElementById("errbar").style.display = "none"; }
+function randSeed() { return Math.floor(Math.random() * 2147483648); }
+
+function getWorkflow(id) {
+  for (var i = 0; i < workflows.length; i++) if (workflows[i].id === id) return workflows[i];
+  return null;
+}
+
+function renderCards() {
+  var box = document.getElementById("cards");
+  box.innerHTML = "";
+  workflows.forEach(function (wf) {
+    var d = document.createElement("div");
+    d.className = "wf-card" + (selected === wf.id ? " active" : "");
+    d.innerHTML = "<b>" + wf.title + "</b><p>" + wf.desc + "</p>";
+    d.onclick = function () { selectWorkflow(wf.id); };
+    box.appendChild(d);
+  });
+}
+
+function makeHelp(text) {
+  if (!text) return document.createTextNode("");
+  var d = document.createElement("div");
+  d.className = "help";
+  d.textContent = text;
+  return d;
+}
+
+function sliderRow(spec, helpText) {
+  var name = spec[0], label = spec[1], min = spec[2], max = spec[3], step = spec[4], def = spec[5];
+  var wrap = document.createElement("div");
+  var lab = document.createElement("label");
+  lab.textContent = label + " — ";
+  var span = document.createElement("span");
+  span.style.color = "var(--accent)";
+  span.textContent = def;
+  lab.appendChild(span);
+  var row = document.createElement("div");
+  row.className = "row";
+  var input = document.createElement("input");
+  input.type = "range";
+  input.min = min; input.max = max; input.step = step; input.value = def;
+  input.id = "sl_" + name;
+  var val = document.createElement("span");
+  val.className = "val";
+  val.textContent = def;
+  input.oninput = function () { span.textContent = input.value; val.textContent = input.value; };
+  row.appendChild(input);
+  row.appendChild(val);
+  wrap.appendChild(lab);
+  wrap.appendChild(row);
+  wrap.appendChild(makeHelp(helpText));
+  return wrap;
+}
+
+function setSlotStaged(name, meta) {
+  var div = document.querySelector('[data-upload="' + name + '"]');
+  if (!div) return;
+  var prev = div.querySelector(".uprev");
+  var msg = div.querySelector(".umsg");
+  if (meta && meta.exists) {
+    div.classList.add("filled");
+    if (msg) msg.textContent = "ready";
+    if (prev) {
+      var img = prev.querySelector("img");
+      if (!img) { img = document.createElement("img"); prev.appendChild(img); }
+      img.src = "/inputs/" + encodeURIComponent(name) + "?t=" + meta.mtime;
+    }
+  } else {
+    div.classList.remove("filled");
+    if (msg) msg.textContent = "no file yet";
+    if (prev) prev.innerHTML = "";
+  }
+}
+
+function refreshInputs(onlyName) {
+  fetch("/api/inputs").then(r => r.ok ? r.json() : Promise.reject()).then(function (d) {
+    var inputs = d.inputs || {};
+    Object.keys(inputs).forEach(function (name) {
+      if (onlyName && name !== onlyName) return;
+      setSlotStaged(name, inputs[name]);
+    });
+  }).catch(function () {});
+}
+
+function buildForm(keepValues) {
+  var wf = getWorkflow(selected);
+  if (!wf) return;
+  var saved = keepValues || {};
+  document.getElementById("formTitle").textContent = wf.title;
+  var noPS = (wf.id === "11");
+  document.getElementById("promptLab").style.display = noPS ? "none" : "";
+  document.getElementById("prompt").style.display = noPS ? "none" : "";
+  document.getElementById("seedWrap").style.display = noPS ? "none" : "";
+  var ta = document.getElementById("prompt");
+  ta.value = saved.prompt !== undefined ? saved.prompt : "";
+  ta.placeholder = PLACEHOLDERS[wf.id] || "describe the image…";
+  var ph = wf.params_help || {};
+  var oldPh = document.getElementById("promptHelp");
+  if (oldPh) oldPh.remove();
+  if (ph.prompt) {
+    var promptHelp = document.createElement("div");
+    promptHelp.className = "help";
+    promptHelp.id = "promptHelp";
+    promptHelp.textContent = ph.prompt;
+    ta.after(promptHelp);
+  }
+  var up = document.getElementById("uploads");
+  up.innerHTML = "";
+  (wf.uploads || []).forEach(function (name) {
+    var lab = document.createElement("label");
+    lab.textContent = name;
+    up.appendChild(lab);
+    var div = document.createElement("div");
+    div.className = "upload";
+    div.setAttribute("data-upload", name);
+    var prev = document.createElement("div");
+    prev.className = "uprev";
+    var msg = document.createElement("div");
+    msg.className = "umsg";
+    msg.textContent = "no file yet";
+    var file = document.createElement("input");
+    file.type = "file";
+    file.style.display = "block";
+    file.style.margin = "8px auto 0";
+    var btn = document.createElement("button");
+    btn.textContent = "Upload";
+    var st = document.createElement("span");
+    st.className = "ustatus";
+    var doUpload = function () {
+      if (!file.files.length) { st.textContent = " pick a file first"; return; }
+      st.textContent = " uploading…";
+      var fr = new FileReader();
+      fr.onload = function () {
+        fetch("/api/upload?name=" + encodeURIComponent(name), {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: fr.result
+        }).then(r => r.ok ? r.json() : Promise.reject()).then(function () {
+          div.classList.remove("missing");
+          div.classList.add("filled");
+          st.textContent = " ✓";
+          refreshInputs(name);
+        }).catch(function () { st.textContent = " failed"; showBanner(); });
+      };
+      fr.readAsArrayBuffer(file.files[0]);
+    };
+    file.onchange = doUpload;
+    btn.onclick = doUpload;
+    div.appendChild(prev);
+    div.appendChild(msg);
+    div.appendChild(file);
+    div.appendChild(btn);
+    div.appendChild(st);
+    up.appendChild(div);
+    up.appendChild(makeHelp(ph.uploads));
+  });
+  if (wf.id === "09") {
+    var poseLab = document.createElement("label");
+    poseLab.textContent = "Pose preset";
+    up.appendChild(poseLab);
+    var sel = document.createElement("select");
+    sel.id = "poseSel";
+    up.appendChild(sel);
+    var fillPoses = function (list, keep) {
+      sel.innerHTML = "";
+      (list || []).forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p;
+        o.textContent = p.replace(/_/g, " ");
+        sel.appendChild(o);
+      });
+      if (keep && list && list.indexOf(keep) !== -1) sel.value = keep;
+    };
+    fillPoses(POSES_CACHE && POSES_CACHE.length ? POSES_CACHE : (wf.presets || []), saved.pose);
+    fetch("/api/poses").then(r => r.ok ? r.json() : Promise.reject()).then(function (data) {
+      POSES_CACHE = data.poses || [];
+      var cur = document.getElementById("poseSel");
+      if (cur) fillPoses(POSES_CACHE.length ? POSES_CACHE : (wf.presets || []), cur.value);
+    }).catch(function () {});
+  }
+  document.getElementById("seed").value = saved.seed !== undefined ? saved.seed : randSeed();
+  var oldSh = document.getElementById("seedHelp");
+  if (oldSh) oldSh.remove();
+  if (ph.seed) {
+    var seedHelp = document.createElement("div");
+    seedHelp.className = "help";
+    seedHelp.id = "seedHelp";
+    seedHelp.textContent = ph.seed;
+    var seedRow = document.querySelector(".seed-row");
+    if (seedRow) seedRow.after(seedHelp);
+  }
+  var sl = document.getElementById("sliders");
+  sl.innerHTML = "";
+  (SLIDERS[wf.id] || []).forEach(function (spec) {
+    sl.appendChild(sliderRow(spec, ph[spec[0]]));
+  });
+  Object.keys(saved).forEach(function (k) {
+    var el = document.getElementById("sl_" + k);
+    if (el) { el.value = saved[k]; el.dispatchEvent(new Event("input")); }
+  });
+  refreshInputs();
+}
+
+function selectWorkflow(id) {
+  selected = id;
+  renderCards();
+  buildForm();
+}
+
+function collectParams() {
+  var p = {
+    prompt: document.getElementById("prompt").value,
+    seed: parseInt(document.getElementById("seed").value, 10) || 0,
+    steps: parseInt((document.getElementById("sl_steps") || {}).value || "30", 10)
+  };
+  ["denoise", "face_weight", "face_weight_2", "cfg"].forEach(function (k) {
+    var el = document.getElementById("sl_" + k);
+    if (el) p[k] = parseFloat(el.value);
+  });
+  var poseEl = document.getElementById("poseSel");
+  if (poseEl && poseEl.value) p.pose = poseEl.value;
+  return p;
+}
+
+function setRunning(running) {
+  document.getElementById("genBtn").disabled = running;
+}
+
+function doGenerate() {
+  if (!selected || pollTimer) return;
+  var wf = getWorkflow(selected);
+  if (!wf) return;
+  var need = wf.uploads || [];
+  fetch("/api/inputs").then(r => r.ok ? r.json() : Promise.reject()).then(function (d) {
+    var inputs = d.inputs || {};
+    var missing = need.filter(function (n) { return !(inputs[n] && inputs[n].exists); });
+    if (missing.length) {
+      document.getElementById("statusLine").textContent = "Upload first: " + missing.join(", ");
+      missing.forEach(function (name) {
+        var el = document.querySelector('[data-upload="' + name + '"]');
+        if (el) el.classList.add("missing");
+      });
+      return;
+    }
+    startJob(wf);
+  }).catch(function () { startJob(wf); });
+}
+
+function startJob(wf) {
+  var params = collectParams();
+  var wfid = wf.id;
+  setRunning(true);
+  document.getElementById("barFill").style.width = "2%";
+  document.getElementById("statusLine").textContent = "Queued…";
+  document.getElementById("etaLine").textContent = "";
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("resultActions").style.display = "none";
+  fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workflow: wfid, params: params })
+  }).then(function (r) {
+    if (r.status === 400) {
+      return r.json().then(function (data) {
+        setRunning(false);
+        document.getElementById("statusLine").textContent = data.error || "bad request";
+        return null;
+      });
+    }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (q) {
+    if (!q) return;
+    pollStatus(q.prompt_id, wfid, params, Date.now());
+  }).catch(function () {
+    setRunning(false);
+    showBanner();
+  });
+}
+
+function pollStatus(pid, wfid, params, t0) {
+  var est = ESTIMATES[wfid] || 60;
+  pollTimer = setInterval(function () {
+    fetch("/api/status/" + encodeURIComponent(pid)).then(r => r.ok ? r.json() : Promise.reject()).then(function (st) {
+      var elapsed = (Date.now() - t0) / 1000;
+      var pct = Math.min(99, Math.round(elapsed / est * 100));
+      document.getElementById("barFill").style.width = pct + "%";
+      document.getElementById("statusLine").textContent = "Running… " + pct + "%";
+      var remain = Math.max(0, Math.round(est - elapsed));
+      document.getElementById("etaLine").textContent = "~" + remain + "s remaining";
+      if (st.failed) {
+        clearInterval(pollTimer); pollTimer = null;
+        setRunning(false);
+        document.getElementById("statusLine").textContent = "Failed";
+        document.getElementById("result").textContent = st.error || "generation failed";
+        return;
+      }
+      if (st.completed) {
+        clearInterval(pollTimer); pollTimer = null;
+        setRunning(false);
+        document.getElementById("barFill").style.width = "100%";
+        document.getElementById("statusLine").textContent = "Done";
+        document.getElementById("etaLine").textContent = "";
+        var res = document.getElementById("result");
+        var actions = document.getElementById("resultActions");
+        res.innerHTML = "";
+        actions.innerHTML = "";
+        actions.style.display = "flex";
+        (st.outputs || []).forEach(function (fn) {
+          var isVid = fn.toLowerCase().endsWith(".mp4");
+          var el = document.createElement(isVid ? "video" : "img");
+          if (isVid) { el.controls = true; el.loop = true; }
+          el.src = "/outputs/" + encodeURIComponent(fn);
+          res.appendChild(el);
+          var dl = document.createElement("button");
+          dl.textContent = "Download";
+          dl.onclick = function () {
+            var a = document.createElement("a");
+            a.href = el.src;
+            a.download = fn;
+            a.click();
+          };
+          actions.appendChild(dl);
+          if (!isVid) {
+            var cu = document.createElement("button");
+            cu.textContent = "Use as cleanup";
+            cu.onclick = function () { stageAsCleanup(fn); };
+            actions.appendChild(cu);
+          }
+          fetch("/api/gallery", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file: fn, workflow: wfid, params: params, prompt_id: pid })
+          }).catch(function () {});
+        });
+        loadGallery();
+      }
+    }).catch(function () {});
+  }, 2000);
+}
+
+function stageAsCleanup(filename) {
+  document.getElementById("statusLine").textContent = "Staging as cleanup…";
+  fetch("/outputs/" + encodeURIComponent(filename)).then(r => r.ok ? r.blob() : Promise.reject()).then(function (blob) {
+    return fetch("/api/upload?name=cleanup.png", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: blob
+    });
+  }).then(r => r.ok ? r.json() : Promise.reject()).then(function () {
+    selectWorkflow("14");
+    document.getElementById("statusLine").textContent = "Cleanup staged — tweak and Generate";
+    refreshInputs("cleanup.png");
+  }).catch(function () {
+    document.getElementById("statusLine").textContent = "Failed to stage cleanup";
+  });
+}
+
+function useLastAsCleanup() {
+  fetch("/api/gallery").then(r => r.ok ? r.json() : Promise.reject()).then(function (d) {
+    var items = d.items || [];
+    if (!items.length) {
+      document.getElementById("statusLine").textContent = "No gallery results yet";
+      return;
+    }
+    var latest = items[0];
+    if (!latest.file) return;
+    stageAsCleanup(latest.file);
+  }).catch(function () {
+    document.getElementById("statusLine").textContent = "Could not load gallery";
+  });
+}
+
+function loadGallery() {
+  fetch("/api/gallery").then(r => r.ok ? r.json() : Promise.reject()).then(function (d) {
+    var box = document.getElementById("gallery");
+    box.innerHTML = "";
+    (d.items || []).forEach(function (item) {
+      var g = document.createElement("div");
+      g.className = "gitem";
+      var isVid = (item.file || "").toLowerCase().endsWith(".mp4");
+      var el = document.createElement(isVid ? "video" : "img");
+      el.src = "/outputs/" + encodeURIComponent(item.file);
+      g.appendChild(el);
+      var lbl = document.createElement("div");
+      lbl.textContent = item.workflow || "";
+      lbl.style.fontSize = "10px";
+      lbl.style.marginTop = "4px";
+      g.appendChild(lbl);
+      var actions = document.createElement("div");
+      actions.className = "g-actions";
+      var loadBtn = document.createElement("button");
+      loadBtn.textContent = "Load";
+      loadBtn.onclick = function (e) { e.stopPropagation(); selectWorkflow(item.workflow); buildForm(item.params || {}); };
+      actions.appendChild(loadBtn);
+      if (!isVid) {
+        var cBtn = document.createElement("button");
+        cBtn.textContent = "Cleanup";
+        cBtn.onclick = function (e) { e.stopPropagation(); stageAsCleanup(item.file); };
+        actions.appendChild(cBtn);
+      }
+      g.appendChild(actions);
+      g.onclick = function () {
+        selectWorkflow(item.workflow);
+        buildForm(item.params || {});
+      };
+      box.appendChild(g);
+    });
+  }).catch(function () {});
+}
+
+function checkHealth() {
+  fetch("/api/workflows").then(r => {
+    if (!r.ok) throw new Error();
+    return r.json();
+  }).then(function (d) {
+    workflows = d.workflows || [];
+    document.getElementById("dot").classList.remove("bad");
+    document.getElementById("connText").textContent = "ready";
+    hideBanner();
+    if (!selected && workflows.length) selectWorkflow(workflows[0].id);
+    else renderCards();
+    loadGallery();
+  }).catch(function () {
+    document.getElementById("dot").classList.add("bad");
+    document.getElementById("connText").textContent = "offline";
+    showBanner();
+  });
+}
+
+document.getElementById("genBtn").onclick = doGenerate;
+document.getElementById("cleanupBtn").onclick = useLastAsCleanup;
+document.getElementById("dice").onclick = function () { document.getElementById("seed").value = randSeed(); };
+document.getElementById("retryBtn").onclick = checkHealth;
+document.addEventListener("keydown", function (e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+    e.preventDefault();
+    if (!document.getElementById("genBtn").disabled) doGenerate();
+  }
+});
+checkHealth();
+</script>
+</body>
+</html>
