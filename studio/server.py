@@ -347,6 +347,45 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/workflows":
             return self._json({"workflows": WORKFLOWS})
+        if self.path == "/api/health":
+            comfy = False
+            try:
+                with urllib.request.urlopen(COMFY + "/system_stats", timeout=2.5) as r:
+                    r.read(64)
+                comfy = True
+            except (urllib.error.URLError, OSError):
+                comfy = False
+            return self._json({"studio": True, "comfy": comfy})
+        if self.path == "/api/inputs":
+            info = {}
+            for name in sorted(ALLOWED_UPLOADS):
+                fpath = os.path.join(INPUT_DIR, name)
+                try:
+                    st = os.stat(fpath)
+                    info[name] = {"exists": True, "mtime": int(st.st_mtime)}
+                except OSError:
+                    info[name] = {"exists": False}
+            return self._json({"inputs": info})
+        if self.path.startswith("/inputs/"):
+            raw = self.path[len("/inputs/"):].split("?")[0].split("/")[0]
+            base = os.path.basename(urllib.parse.unquote(raw))
+            if base not in ALLOWED_UPLOADS:
+                return self._json({"error": "not found"}, 404)
+            fpath = os.path.join(INPUT_DIR, base)
+            if not os.path.isfile(fpath):
+                return self._json({"error": "not found"}, 404)
+            try:
+                with open(fpath, "rb") as f:
+                    data = f.read()
+            except OSError:
+                return self._json({"error": "not found"}, 404)
+            ctype = "image/png" if base.lower().endswith(".png") else "application/octet-stream"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if self.path == "/api/poses":
             poses_dir = os.path.join(INPUT_DIR, "poses")
             try:
@@ -400,7 +439,29 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self._json({"error": "ComfyUI not running. Start it with start_server.bat, then retry."}, 502)
             if pid not in hist:
-                return self._json({"completed": False, "outputs": [], "failed": False, "error": ""})
+                running = False
+                queue_pos = None
+                queue_ok = False
+                try:
+                    with urllib.request.urlopen(COMFY + "/queue", timeout=10) as r:
+                        q = json.loads(r.read())
+                    queue_ok = True
+                    for ent in (q.get("queue_running") or []):
+                        if len(ent) > 1 and str(ent[1]) == pid:
+                            running = True
+                            break
+                    if not running:
+                        for i, ent in enumerate(q.get("queue_pending") or []):
+                            if len(ent) > 1 and str(ent[1]) == pid:
+                                queue_pos = i + 1
+                                break
+                except (urllib.error.URLError, OSError, ValueError, UnicodeDecodeError):
+                    pass
+                if queue_ok and not running and queue_pos is None:
+                    return self._json({"completed": False, "outputs": [], "failed": True,
+                                       "error": "This job is no longer in ComfyUI's queue (it may have restarted or been interrupted). Press Generate to retry."})
+                return self._json({"completed": False, "outputs": [], "failed": False,
+                                   "error": "", "running": running, "queue_pos": queue_pos})
             entry = hist[pid]
             outputs = entry.get("outputs", {}) or {}
             filenames = []

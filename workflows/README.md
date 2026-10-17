@@ -11,7 +11,8 @@ Put your photo in `ComfyUI_windows_portable/ComfyUI/input/` named
 
 Drag a workflow JSON from this folder into the ComfyUI browser window,
 then press **Queue**. Outputs land in `ComfyUI_windows_portable/ComfyUI/output/`.
-All six workflows were tested end-to-end on this machine.
+All the user-facing workflows were tested end-to-end on this machine
+(helper 08 and experiment 13 noted separately below).
 
 ### 01_photo_to_nsfw_image.json — outfit change, same pose/face ✓ tested
 img2img (denoise 0.55) + IPAdapter PLUS FACE lock.
@@ -49,6 +50,13 @@ for the motion (kissing, caressing, etc.).
 Text-to-image on RealVisXL: no photo is used and faces won't match
 anyone. Edit node 62 for the full image description (subject, pose,
 clothes, setting), node 64 for seed/steps. Output: `prompt_image_*.png`.
+
+### 08_extract_skeleton.json — photo to pose-skeleton PNG (helper)
+Runs OpenPose (node 71) on a photo and saves the rendered skeleton with
+prefix `skel_standing`. Put the source photo in `ComfyUI/input/` named
+`pose_src_standing.png` (or edit node 70), queue, then copy the result from
+`ComfyUI/output/` into `ComfyUI/input/poses/` to use it as a pose preset in
+the Studio (workflow 09). Not exposed as a Studio card.
 
 ### 09_pose_preset.json — photo + preset pose, face locked
 Same img2img + IPAdapter PLUS FACE lock as 01 (denoise 0.6), but the
@@ -88,6 +96,15 @@ mask, node 99 for seed/steps. Studio auto-generates a feathered mask
 sends it as `auto_mask.png` (node 92); node 93 rescales it and node 89
 converts to mask, so no manual mask file is needed. Output:
 `undress_*.png`.
+
+### 13_inpaint_proper.json — inpaint with the official SDXL inpaint model
+Alternative to 12 built on `sd_xl_inpaint_0.1_fp16.safetensors` +
+`InpaintModelConditioning` (node 97), wired to `source_bra.png` +
+`mask_bra_garment.png` (nodes 90/92 — edit for other images). Edit node 95
+for content, node 99 for seed/steps. Output `inpaint_pro_*.png`. NOTE: the
+official inpaint model is content-filtered (no nudity) — for undress use 12
+on uncensored RealVisXL; 13 is kept for SFW repaints and experiments. Not
+exposed as a Studio card.
 
 ## Prompt tips
 - Keep identity words in the prompt ("same woman, same face").

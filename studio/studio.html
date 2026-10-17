@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ImGen Studio</title>
 <style>
   * { box-sizing: border-box; font-family: "Segoe UI", Arial, sans-serif; }
@@ -9,6 +10,14 @@
   header { padding: 12px 20px; background: #1d2026; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 12px; }
   header h1 { font-size: 18px; margin: 0; }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #4caf50; display: inline-block; }
+  .dot.bad { background: #e53e3e; }
+  .loading { color: #888; font-size: 13px; padding: 8px; }
+  .uprev img { display: block; max-width: 100%; max-height: 150px; border-radius: 4px; margin: 0 auto 6px; }
+  .umsg { font-size: 12px; color: #888; }
+  .reswrap { width: 100%; text-align: center; }
+  .openlink { display: inline-block; font-size: 12px; color: #4da3ff; text-decoration: none; margin-top: 6px; }
+  .openlink:hover { text-decoration: underline; }
+  .gitem video { max-width: 100%; max-height: 90px; background: #000; }
   #errbar { display: none; background: #a02020; color: #fff; text-align: center; padding: 8px; font-size: 13px; }
   #errbar button { margin-left: 12px; padding: 4px 14px; cursor: pointer; }
   .layout { display: grid; grid-template-columns: 260px 1fr 320px; gap: 12px; padding: 12px; min-height: calc(100vh - 140px); }
@@ -49,22 +58,13 @@
 </style>
 </head>
 <body>
-<header><span class="dot"></span><h1>ImGen Studio</h1><span style="color:#888;font-size:13px">ComfyUI connected :8188</span></header>
+<header><span class="dot" id="dot"></span><h1>ImGen Studio</h1><span id="connText" style="color:#888;font-size:13px">checking…</span></header>
 <div id="errbar"><span>ComfyUI or Studio server not running &mdash; run start_server.bat (and studio server), then Retry</span><button id="retryBtn">Retry</button></div>
 
 <div class="layout">
   <div class="panel">
     <h2>Workflows</h2>
-    <div id="cards">
-      <div class="wf-card" data-wf="01"><b>01 · Outfit change</b><p>Same pose and face, new outfit</p></div>
-      <div class="wf-card" data-wf="02"><b>02 · Pose change</b><p>New pose via pose reference</p></div>
-      <div class="wf-card" data-wf="03"><b>03 · Photo to video</b><p>LTX-Video, 97 frames (~4s), recommended</p></div>
-      <div class="wf-card" data-wf="04"><b>04 · AnimateDiff clip</b><p>Short prompt-driven motion, 16 frames</p></div>
-      <div class="wf-card" data-wf="05"><b>05 · Couple still</b><p>Two photos become one couple scene</p></div>
-      <div class="wf-card" data-wf="06"><b>06 · Couple video</b><p>Still becomes a kissing-motion clip</p></div>
-      <div class="wf-card" data-wf="07"><b>07 · Prompt to image</b><p>Pure text-to-image, no photo needed</p></div>
-      <div class="wf-card" data-wf="09"><b>09 · Pose preset</b><p>Your photo, a chosen preset pose, face locked</p></div>
-    </div>
+    <div id="cards"><div class="loading">Loading workflows…</div></div>
   </div>
 
   <div class="panel">
@@ -205,6 +205,42 @@ function sliderRow(spec, helpText) {
   return wrap;
 }
 
+function setSlotStaged(name, meta) {
+  var div = document.querySelector('[data-upload="' + name + '"]');
+  if (!div) return;
+  var prev = div.querySelector(".uprev");
+  var msg = div.querySelector(".umsg");
+  if (meta && meta.exists) {
+    div.classList.add("filled");
+    if (msg) msg.textContent = "staged " + new Date(meta.mtime * 1000).toLocaleTimeString();
+    if (prev) {
+      var img = prev.querySelector("img");
+      if (!img) {
+        img = document.createElement("img");
+        prev.appendChild(img);
+      }
+      img.src = "/inputs/" + encodeURIComponent(name) + "?t=" + meta.mtime;
+    }
+  } else {
+    div.classList.remove("filled");
+    if (msg) msg.textContent = "no file staged yet";
+    if (prev) prev.innerHTML = "";
+  }
+}
+
+function refreshInputs(onlyName) {
+  fetch("/api/inputs").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (d) {
+    var inputs = d.inputs || {};
+    Object.keys(inputs).forEach(function (name) {
+      if (onlyName && name !== onlyName) return;
+      setSlotStaged(name, inputs[name]);
+    });
+  }).catch(function () {});
+}
+
 function buildForm(keepValues) {
   var wf = getWorkflow(selected);
   if (!wf) return;
@@ -237,7 +273,11 @@ function buildForm(keepValues) {
     var div = document.createElement("div");
     div.className = "upload";
     div.setAttribute("data-upload", name);
-    div.textContent = name + " \u2014 choose file, then Upload";
+    var prev = document.createElement("div");
+    prev.className = "uprev";
+    var msg = document.createElement("div");
+    msg.className = "umsg";
+    msg.textContent = "no file staged yet";
     var file = document.createElement("input");
     file.type = "file";
     file.style.display = "block";
@@ -246,7 +286,7 @@ function buildForm(keepValues) {
     btn.textContent = "Upload";
     var st = document.createElement("span");
     st.className = "ustatus";
-    btn.onclick = function () {
+    var doUpload = function () {
       if (!file.files.length) { st.textContent = " pick a file first"; return; }
       st.textContent = " uploading\u2026";
       var fr = new FileReader();
@@ -259,8 +299,10 @@ function buildForm(keepValues) {
           if (!r.ok) throw new Error("HTTP " + r.status);
           return r.json();
         }).then(function () {
+          div.classList.remove("missing");
           div.classList.add("filled");
-          st.textContent = " \u2713 uploaded";
+          st.textContent = " ✓ uploaded";
+          refreshInputs(name);
         }).catch(function () {
           st.textContent = " upload failed";
           showBanner();
@@ -268,7 +310,10 @@ function buildForm(keepValues) {
       };
       fr.readAsArrayBuffer(file.files[0]);
     };
-    div.appendChild(document.createElement("br"));
+    file.onchange = doUpload;
+    btn.onclick = doUpload;
+    div.appendChild(prev);
+    div.appendChild(msg);
     div.appendChild(file);
     div.appendChild(btn);
     div.appendChild(st);
@@ -330,6 +375,7 @@ function buildForm(keepValues) {
       el.dispatchEvent(new Event("input"));
     }
   });
+  refreshInputs();
 }
 
 function selectWorkflow(id) {
@@ -359,8 +405,30 @@ function setRunning(running) {
 
 function doGenerate() {
   if (!selected || pollTimer) return;
+  var wf = getWorkflow(selected);
+  if (!wf) return;
+  var need = wf.uploads || [];
+  fetch("/api/inputs").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (d) {
+    var inputs = d.inputs || {};
+    var missing = need.filter(function (n) { return !(inputs[n] && inputs[n].exists); });
+    if (missing.length) {
+      document.getElementById("statusLine").textContent = "Upload first: " + missing.join(", ");
+      missing.forEach(function (name) {
+        var el = document.querySelector('[data-upload="' + name + '"]');
+        if (el) el.classList.add("missing");
+      });
+      return;
+    }
+    startJob(wf);
+  }).catch(function () { startJob(wf); });
+}
+
+function startJob(wf) {
   var params = collectParams();
-  var wfid = selected;
+  var wfid = wf.id;
   setRunning(true);
   document.getElementById("barFill").style.width = "2%";
   document.getElementById("statusLine").textContent = "Queued\u2026";
@@ -381,7 +449,7 @@ function doGenerate() {
             if (el) el.classList.add("missing");
           });
         } else {
-          showBanner();
+          document.getElementById("statusLine").textContent = (data && data.error) || "could not queue the job";
         }
         return null;
       });
@@ -390,26 +458,24 @@ function doGenerate() {
     return r.json();
   }).then(function (q) {
     if (!q) return;
-    pollStatus(q.prompt_id, wfid, params, Date.now());
+    pollStatus(q.prompt_id, wfid, params);
   }).catch(function () {
     setRunning(false);
     showBanner();
   });
 }
 
-function pollStatus(pid, wfid, params, t0) {
+function pollStatus(pid, wfid, params) {
   var est = ESTIMATES[wfid] || 60;
+  var runStart = null;
   pollTimer = setInterval(function () {
     fetch("/api/status/" + encodeURIComponent(pid)).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }).then(function (st) {
-      var elapsed = (Date.now() - t0) / 1000;
-      var pct = Math.min(99, Math.round(elapsed / est * 100));
-      document.getElementById("barFill").style.width = pct + "%";
-      document.getElementById("statusLine").textContent = "Running\u2026 " + pct + "%";
-      var remain = Math.max(0, Math.round(est - elapsed));
-      document.getElementById("etaLine").textContent = "~" + remain + "s remaining \u00b7 estimate";
+      var bar = document.getElementById("barFill");
+      var line = document.getElementById("statusLine");
+      var eta = document.getElementById("etaLine");
       if (st.failed) {
         clearInterval(pollTimer); pollTimer = null;
         setRunning(false);
@@ -430,7 +496,22 @@ function pollStatus(pid, wfid, params, t0) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ file: first, workflow: wfid, params: params, prompt_id: pid })
         }).then(loadGallery).catch(function () {});
+        return;
       }
+      if (!st.running) {
+        bar.style.width = "4%";
+        var qp = (typeof st.queue_pos === "number" && st.queue_pos > 0) ? " (position " + st.queue_pos + ")" : "";
+        line.textContent = "Queued — waiting for the GPU" + qp + "…";
+        eta.textContent = "starts automatically when the GPU is free";
+        return;
+      }
+      if (!runStart) runStart = Date.now();
+      var elapsed = (Date.now() - runStart) / 1000;
+      var pct = Math.min(99, Math.round(4 + elapsed / est * 95));
+      bar.style.width = pct + "%";
+      line.textContent = "Running\u2026 " + pct + "%";
+      var remain = Math.max(0, Math.round(est - elapsed));
+      eta.textContent = "~" + remain + "s remaining \u00b7 estimate";
     }).catch(function () {
       clearInterval(pollTimer); pollTimer = null;
       setRunning(false);
@@ -445,11 +526,20 @@ function showResult(files) {
   if (!files.length) { box.textContent = "[ no output files ]"; return; }
   files.forEach(function (fn) {
     var url = "/outputs/" + encodeURIComponent(fn);
+    var wrap = document.createElement("div");
+    wrap.className = "reswrap";
     var el;
     if (/\.png$/i.test(fn)) { el = document.createElement("img"); el.src = url; }
     else if (/\.mp4$/i.test(fn)) { el = document.createElement("video"); el.src = url; el.controls = true; }
     else { el = document.createElement("div"); el.textContent = fn; }
-    box.appendChild(el);
+    wrap.appendChild(el);
+    var a = document.createElement("a");
+    a.href = url;
+    a.target = "_blank";
+    a.className = "openlink";
+    a.textContent = "open full size ↗";
+    wrap.appendChild(a);
+    box.appendChild(wrap);
   });
 }
 
@@ -469,9 +559,11 @@ function loadGallery() {
         img.src = "/outputs/" + encodeURIComponent(fn);
         d.appendChild(img);
       } else if (/\.mp4$/i.test(fn)) {
-        var tag = document.createElement("div");
-        tag.textContent = "[video] " + fn;
-        d.appendChild(tag);
+        var vid = document.createElement("video");
+        vid.src = "/outputs/" + encodeURIComponent(fn);
+        vid.preload = "metadata";
+        vid.muted = true;
+        d.appendChild(vid);
       } else {
         var other = document.createElement("div");
         other.textContent = fn || "(no file)";
@@ -514,7 +606,29 @@ function init() {
   }).catch(function () { showBanner(); });
 }
 
+function checkHealth() {
+  var dot = document.getElementById("dot");
+  var txt = document.getElementById("connText");
+  fetch("/api/health").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (h) {
+    if (h.comfy) {
+      dot.classList.remove("bad");
+      txt.textContent = "ComfyUI connected \u00b7 :8188";
+    } else {
+      dot.classList.add("bad");
+      txt.textContent = "ComfyUI offline \u2014 start ComfyUI (run_nvidia_gpu.bat)";
+    }
+  }).catch(function () {
+    dot.classList.add("bad");
+    txt.textContent = "studio server unreachable";
+  });
+}
+
 init();
+checkHealth();
+setInterval(checkHealth, 20000);
 </script>
 </body>
 </html>
