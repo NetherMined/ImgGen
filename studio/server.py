@@ -321,11 +321,10 @@ def fill_template(wfid, params):
             pass
     if wfid in ("12", "13", "14"):
         try:
-            src_name = "photo.png" if wfid != "14" else "cleanup.png"
+            src_name = "cleanup.png" if wfid == "14" else "photo.png"
             try:
-                node90 = wf.get("90", {}).get("inputs", {})
-                if isinstance(node90, dict) and node90.get("image"):
-                    src_name = os.path.basename(str(node90["image"]))
+                if isinstance(wf.get("90"), dict) and isinstance(wf["90"].get("inputs"), dict):
+                    wf["90"]["inputs"]["image"] = src_name
             except (TypeError, AttributeError):
                 pass
             dims = read_image_dims(os.path.join(INPUT_DIR, src_name))
@@ -384,6 +383,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/workflows":
             return self._json({"workflows": WORKFLOWS})
+        if self.path == "/api/health":
+            comfy = False
+            try:
+                with urllib.request.urlopen(COMFY + "/system_stats", timeout=2.5) as r:
+                    r.read(64)
+                comfy = True
+            except (urllib.error.URLError, OSError):
+                comfy = False
+            return self._json({"studio": True, "comfy": comfy})
         if self.path == "/api/poses":
             poses_dir = os.path.join(INPUT_DIR, "poses")
             try:
@@ -457,9 +465,34 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 with urllib.request.urlopen(COMFY + "/history/" + urllib.parse.quote(pid), timeout=10) as r:
                     hist = json.loads(r.read())
-            except Exception:
-                return self._json({"completed": False, "failed": False, "outputs": [], "error": "unreachable"})
-            entry = hist.get(pid) or {}
+            except (urllib.error.URLError, OSError, ValueError):
+                return self._json({"completed": False, "failed": True,
+                                   "error": "ComfyUI not reachable (it may have restarted) - press Generate to retry."}, 502)
+            entry = hist.get(pid)
+            if not entry:
+                running = False
+                queue_pos = None
+                queue_ok = False
+                try:
+                    with urllib.request.urlopen(COMFY + "/queue", timeout=10) as r:
+                        q = json.loads(r.read())
+                    queue_ok = True
+                    for ent in (q.get("queue_running") or []):
+                        if len(ent) > 1 and str(ent[1]) == pid:
+                            running = True
+                            break
+                    if not running:
+                        for i, ent in enumerate(q.get("queue_pending") or []):
+                            if len(ent) > 1 and str(ent[1]) == pid:
+                                queue_pos = i + 1
+                                break
+                except (urllib.error.URLError, OSError, ValueError):
+                    pass
+                if queue_ok and not running and queue_pos is None:
+                    return self._json({"completed": False, "failed": True,
+                                       "error": "This job is no longer in ComfyUI's queue (it may have been interrupted). Press Generate to retry."})
+                return self._json({"completed": False, "failed": False, "outputs": [],
+                                   "error": "", "running": running, "queue_pos": queue_pos})
             outputs = []
             for node in (entry.get("outputs") or {}).values():
                 for img in node.get("images") or []:
@@ -468,9 +501,17 @@ class Handler(BaseHTTPRequestHandler):
                 for vid in node.get("videos") or []:
                     if vid.get("filename"):
                         outputs.append(vid["filename"])
-            completed = bool(entry.get("status", {}).get("completed"))
-            failed = bool(entry.get("status", {}).get("status_str") == "error")
-            error = entry.get("status", {}).get("messages", [""])[-1] if failed else ""
+            status = entry.get("status") or {}
+            completed = bool(status.get("completed"))
+            failed = bool(status.get("status_str") == "error")
+            error = ""
+            if failed:
+                msgs = status.get("messages") or []
+                last = msgs[-1] if msgs else None
+                if isinstance(last, (list, tuple)) and len(last) >= 2 and isinstance(last[1], dict):
+                    error = str(last[1].get("exception_message") or last[1].get("message") or last[0])
+                elif last is not None:
+                    error = str(last)
             return self._json({"completed": completed, "failed": failed, "outputs": outputs, "error": error})
         return self._json({"error": "not found"}, 404)
 
@@ -490,6 +531,11 @@ class Handler(BaseHTTPRequestHandler):
             raw = self.rfile.read(length) if length else b""
             if len(raw) > MAX_UPLOAD:
                 return self._json({"error": "too large"}, 413)
+            is_png = raw[:8] == bytes([137, 80, 78, 71, 13, 10, 26, 10])
+            is_jpg = raw[:2] == bytes([255, 216])
+            is_webp = raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+            if not (is_png or is_jpg or is_webp):
+                return self._json({"error": "upload must be a PNG, JPEG or WebP image"}, 400)
             try:
                 os.makedirs(INPUT_DIR, exist_ok=True)
                 with open(os.path.join(INPUT_DIR, name), "wb") as f:
@@ -512,6 +558,8 @@ class Handler(BaseHTTPRequestHandler):
             if (wfid == "09" and isinstance(params, dict) and "pose" not in params
                     and "pose" in body):
                 params["pose"] = body["pose"]
+            if not any(w["id"] == wfid for w in WORKFLOWS):
+                return self._json({"error": "unknown workflow: " + str(wfid)}, 400)
             if wfid in REQUIRED_INPUTS:
                 missing = [n for n in REQUIRED_INPUTS[wfid]
                            if not os.path.isfile(os.path.join(INPUT_DIR, n))]

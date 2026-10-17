@@ -36,7 +36,7 @@ its input/output folders contain personal media. Both are intentionally gitignor
 `01` outfit change · `02` pose change · `03` photo→video (LTX-Video) · `04` AnimateDiff clip ·
 `05` couple still (dual face lock) · `06` couple still→video · `07` prompt→image ·
 `08` skeleton extract · `09` pose preset · `10` txt2img face-lock · `11` ReActor face swap ·
-`12` inpaint undress · `13` inpaint (proper) — details in `workflows/README.md`.
+`12` inpaint undress · `13` inpaint (proper) · `14` cleanup pass — details in `workflows/README.md`.
 
 ## Notes
 

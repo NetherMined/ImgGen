@@ -137,7 +137,7 @@ var PLACEHOLDERS = {
   "14": "describe clean skin for residual areas…"
 };
 
-var ESTIMATES = { "01": 60, "02": 60, "03": 300, "04": 300, "05": 60, "06": 300, "07": 60, "09": 60, "10": 60, "11": 60, "12": 60, "13": 60, "14": 45 };
+var ESTIMATES = { "01": 60, "02": 60, "03": 300, "04": 300, "05": 60, "06": 300, "07": 60, "09": 60, "10": 60, "11": 60, "12": 60, "13": 240, "14": 240 };
 
 var SLIDERS = {
   "01": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.55], ["face_weight", "Face weight", 0.3, 1.0, 0.05, 0.7], ["steps", "Steps", 10, 50, 1, 30]],
@@ -169,7 +169,12 @@ function renderCards() {
   workflows.forEach(function (wf) {
     var d = document.createElement("div");
     d.className = "wf-card" + (selected === wf.id ? " active" : "");
-    d.innerHTML = "<b>" + wf.title + "</b><p>" + wf.desc + "</p>";
+    var b = document.createElement("b");
+    b.textContent = wf.title;
+    var p = document.createElement("p");
+    p.textContent = wf.desc;
+    d.appendChild(b);
+    d.appendChild(p);
     d.onclick = function () { selectWorkflow(wf.id); };
     box.appendChild(d);
   });
@@ -278,6 +283,7 @@ function buildForm(keepValues) {
     msg.textContent = "no file yet";
     var file = document.createElement("input");
     file.type = "file";
+    file.accept = "image/png,image/jpeg,image/webp";
     file.style.display = "block";
     file.style.margin = "8px auto 0";
     var btn = document.createElement("button");
@@ -429,27 +435,26 @@ function startJob(wf) {
     return r.json();
   }).then(function (q) {
     if (!q) return;
-    pollStatus(q.prompt_id, wfid, params, Date.now());
+    pollStatus(q.prompt_id, wfid, params);
   }).catch(function () {
     setRunning(false);
     showBanner();
   });
 }
 
-function pollStatus(pid, wfid, params, t0) {
+function pollStatus(pid, wfid, params) {
   var est = ESTIMATES[wfid] || 60;
+  var runStart = null;
   pollTimer = setInterval(function () {
     fetch("/api/status/" + encodeURIComponent(pid)).then(r => r.ok ? r.json() : Promise.reject()).then(function (st) {
-      var elapsed = (Date.now() - t0) / 1000;
-      var pct = Math.min(99, Math.round(elapsed / est * 100));
-      document.getElementById("barFill").style.width = pct + "%";
-      document.getElementById("statusLine").textContent = "Running… " + pct + "%";
-      var remain = Math.max(0, Math.round(est - elapsed));
-      document.getElementById("etaLine").textContent = "~" + remain + "s remaining";
+      var bar = document.getElementById("barFill");
+      var line = document.getElementById("statusLine");
+      var eta = document.getElementById("etaLine");
       if (st.failed) {
         clearInterval(pollTimer); pollTimer = null;
         setRunning(false);
-        document.getElementById("statusLine").textContent = "Failed";
+        line.textContent = "Failed";
+        eta.textContent = "";
         document.getElementById("result").textContent = st.error || "generation failed";
         return;
       }
@@ -492,8 +497,29 @@ function pollStatus(pid, wfid, params, t0) {
           }).catch(function () {});
         });
         loadGallery();
+        return;
       }
-    }).catch(function () {});
+      if (!st.running) {
+        bar.style.width = "4%";
+        var qp = (typeof st.queue_pos === "number" && st.queue_pos > 0) ? " (position " + st.queue_pos + ")" : "";
+        line.textContent = "Queued — waiting for the GPU" + qp + "…";
+        eta.textContent = "starts automatically when the GPU is free";
+        return;
+      }
+      if (!runStart) runStart = Date.now();
+      var elapsed = (Date.now() - runStart) / 1000;
+      var pct = Math.min(99, Math.round(4 + elapsed / est * 95));
+      bar.style.width = pct + "%";
+      line.textContent = "Running… " + pct + "%";
+      var remain = Math.max(0, Math.round(est - elapsed));
+      eta.textContent = "~" + remain + "s remaining";
+    }).catch(function () {
+      clearInterval(pollTimer); pollTimer = null;
+      setRunning(false);
+      document.getElementById("statusLine").textContent = "Lost connection to ComfyUI — press Generate to retry";
+      document.getElementById("etaLine").textContent = "";
+      showBanner();
+    });
   }, 2000);
 }
 
@@ -567,36 +593,59 @@ function loadGallery() {
   }).catch(function () {});
 }
 
-function checkHealth() {
-  fetch("/api/workflows").then(r => {
-    if (!r.ok) throw new Error();
-    return r.json();
-  }).then(function (d) {
+function loadWorkflows() {
+  fetch("/api/workflows").then(r => r.ok ? r.json() : Promise.reject()).then(function (d) {
     workflows = d.workflows || [];
-    document.getElementById("dot").classList.remove("bad");
-    document.getElementById("connText").textContent = "ready";
     hideBanner();
     if (!selected && workflows.length) selectWorkflow(workflows[0].id);
     else renderCards();
     loadGallery();
   }).catch(function () {
-    document.getElementById("dot").classList.add("bad");
-    document.getElementById("connText").textContent = "offline";
+    var box = document.getElementById("cards");
+    box.innerHTML = "";
+    var d = document.createElement("div");
+    d.style.cssText = "font-size:13px;padding:8px";
+    d.textContent = "Could not load workflows";
+    box.appendChild(d);
     showBanner();
   });
+}
+
+function checkHealth() {
+  fetch("/api/health").then(r => r.ok ? r.json() : Promise.reject()).then(function (h) {
+    var dot = document.getElementById("dot");
+    var txt = document.getElementById("connText");
+    if (h.comfy) {
+      dot.classList.remove("bad");
+      txt.textContent = "ComfyUI connected · :8188";
+    } else {
+      dot.classList.add("bad");
+      txt.textContent = "ComfyUI offline — start it, then Retry";
+    }
+  }).catch(function () {
+    document.getElementById("dot").classList.add("bad");
+    document.getElementById("connText").textContent = "studio server unreachable";
+    showBanner();
+  });
+}
+
+function init() {
+  loadWorkflows();
+  checkHealth();
 }
 
 document.getElementById("genBtn").onclick = doGenerate;
 document.getElementById("cleanupBtn").onclick = useLastAsCleanup;
 document.getElementById("dice").onclick = function () { document.getElementById("seed").value = randSeed(); };
-document.getElementById("retryBtn").onclick = checkHealth;
+document.getElementById("retryBtn").onclick = init;
 document.addEventListener("keydown", function (e) {
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
     e.preventDefault();
     if (!document.getElementById("genBtn").disabled) doGenerate();
   }
 });
-checkHealth();
+init();
+setInterval(checkHealth, 20000);
 </script>
 </body>
 </html>

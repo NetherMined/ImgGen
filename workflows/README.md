@@ -12,7 +12,7 @@ Put your photo in `ComfyUI_windows_portable/ComfyUI/input/` named
 Drag a workflow JSON from this folder into the ComfyUI browser window,
 then press **Queue**. Outputs land in `ComfyUI_windows_portable/ComfyUI/output/`.
 All the user-facing workflows were tested end-to-end on this machine
-(helper 08 and experiment 13 noted separately below).
+(helper 08 and the experiments 13/14 are noted below).
 
 ### 01_photo_to_nsfw_image.json — outfit change, same pose/face ✓ tested
 img2img (denoise 0.55) + IPAdapter PLUS FACE lock.
@@ -92,19 +92,30 @@ Inpaint on RealVisXL: only the masked torso region is repainted (node 97
 `VAEEncodeForInpaint`, grow 48), everything else — incl. the face —
 is pixel-identical. Edit node 95 for the skin/body to paint into the
 mask, node 99 for seed/steps. Studio auto-generates a feathered mask
-(white below 30% height, ~5% feather) sized to your source photo and
-sends it as `auto_mask.png` (node 92); node 93 rescales it and node 89
+(black above ~5% height, solid white below ~20%, soft ramp between —
+starts just under the collarbone) sized to your source photo and sends
+it as `auto_mask.png` (node 92); node 93 rescales it and node 89
 converts to mask, so no manual mask file is needed. Output:
 `undress_*.png`.
 
 ### 13_inpaint_proper.json — inpaint with the official SDXL inpaint model
 Alternative to 12 built on `sd_xl_inpaint_0.1_fp16.safetensors` +
-`InpaintModelConditioning` (node 97), wired to `source_bra.png` +
-`mask_bra_garment.png` (nodes 90/92 — edit for other images). Edit node 95
+`InpaintModelConditioning` (node 97). Studio loads your uploaded `photo.png`
+(node 90) and the same Studio-generated `auto_mask.png` as 12; edit node 95
 for content, node 99 for seed/steps. Output `inpaint_pro_*.png`. NOTE: the
 official inpaint model is content-filtered (no nudity) — for undress use 12
-on uncensored RealVisXL; 13 is kept for SFW repaints and experiments. Not
-exposed as a Studio card.
+on uncensored RealVisXL; 13 is kept for SFW repaints and strap/edge cleanup
+experiments. Heavy on 8GB VRAM (holds the inpaint UNET *and* a RealVis
+checkpoint at once) — expect several minutes per run.
+
+### 14_cleanup_pass.json — second pass for residual straps/seams
+Cleans up a previous result: the Studio's "Use as cleanup" button (on a
+result or gallery item) stages that image as `cleanup.png` (node 90) and
+switches to this card — it also generates the feathered `auto_mask.png`
+sized to the image. Prompts live in nodes 95/96, seed/steps/denoise in
+node 99 (denoise 0.4-0.6 for residual cleanup). Output: `cleanup_*.png`.
+Uses the same content-filtered SDXL inpaint UNET as 13 — check the result
+on your images; a censored inpaint can only fix what it allows.
 
 ## Prompt tips
 - Keep identity words in the prompt ("same woman, same face").
