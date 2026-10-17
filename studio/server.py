@@ -52,7 +52,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the new outfit concretely.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "denoise": "~0.4 keeps close; 0.55-0.65 for outfit swaps.",
          "face_weight": "Lower drifts; above 0.85 can look pasted-on.",
          "uploads": "Front-facing, well-lit photos lock best."}},
@@ -61,7 +61,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the new pose and outfit.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "denoise": "0.55-0.65 for pose swaps.",
          "face_weight": "Lower drifts; above 0.85 can look pasted-on.",
          "uploads": "Front-facing, well-lit photos lock best."}},
@@ -83,7 +83,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the couple scene.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "face_weight": "How strictly faces must match.",
          "face_weight_2": "Second face weight.",
          "uploads": "Front-facing, well-lit photos lock best."}},
@@ -99,7 +99,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the whole image.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot."}},
+         "steps": "20-30 is the sweet spot."}},
     {"id": "09", "file": "09_pose_preset.json", "title": "Pose preset",
      "desc": "Your photo, a chosen preset pose, face locked", "uploads": ["photo.png"],
      "presets": ["skel_standing", "skel_sitting", "skel_kneeling", "skel_lying_side",
@@ -108,7 +108,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the outfit and scene.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "denoise": "0.55-0.65 typical.",
          "face_weight": "Lower drifts; above 0.85 can look pasted-on.",
          "uploads": "Front-facing, well-lit photos lock best."}},
@@ -117,7 +117,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the full image.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "face_weight": "How strictly faces must match.",
          "uploads": "Front-facing, well-lit photos lock best."}},
     {"id": "11", "file": "11_faceswap.json", "title": "Face swap",
@@ -129,7 +129,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the skin/body to paint into the masked area.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "denoise": "1.0 for full inpaint; lower for subtle.",
          "cfg": "5.0 typical; higher forces the prompt more.",
          "uploads": "Front-facing, well-lit photos lock best."}},
@@ -138,7 +138,7 @@ WORKFLOWS = [
      "params_help": {
          "prompt": "Describe the skin/body to paint. Better on straps and edges.",
          "seed": "Same seed + settings = same image.",
-         "steps": "25-35 is the sweet spot.",
+         "steps": "20-30 is the sweet spot.",
          "denoise": "1.0 for full; lower for cleanup.",
          "cfg": "5.0 typical.",
          "uploads": "Front-facing, well-lit photos lock best."}},

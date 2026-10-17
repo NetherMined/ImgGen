@@ -126,6 +126,9 @@ on your images; a censored inpaint can only fix what it allows.
 
 ## Notes
 - First run of a workflow is slower (model loads into VRAM, ~30-60s).
+- SDXL image workflows (01/02/05/09/10/12) decode with `VAEDecodeTiled`
+  (512px tiles): a full-frame decode under VRAM pressure spills into
+  shared memory and can take many minutes, tiled stays fast on 8GB.
 - 8GB VRAM: don't raise LTXV length above 97 or AnimateDiff batch
   above 16 without expecting offload slowdowns.
 - Optional: an NSFW LoRA in `models/loras/` + LoraLoaderModelOnly
