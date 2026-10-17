@@ -73,7 +73,7 @@
   <h1>ImGen Studio</h1>
   <span id="connText" style="color:var(--muted);font-size:13px;margin-left:auto">checking…</span>
 </header>
-<div id="errbar"><span>ComfyUI not reachable — start it, then Retry</span><button id="retryBtn">Retry</button></div>
+<div id="errbar"><span id="errmsg">ComfyUI not reachable — start it, then Retry</span><button id="retryBtn">Retry</button></div>
 
 <div class="layout">
   <div class="panel">
@@ -154,7 +154,10 @@ var SLIDERS = {
   "14": [["denoise", "Denoise", 0.3, 0.7, 0.05, 0.5], ["cfg", "CFG", 3.0, 8.0, 0.5, 5.0], ["steps", "Steps", 10, 40, 1, 25]]
 };
 
-function showBanner() { document.getElementById("errbar").style.display = "block"; }
+function showBanner(msg) {
+  if (msg) document.getElementById("errmsg").textContent = msg;
+  document.getElementById("errbar").style.display = "block";
+}
 function hideBanner() { document.getElementById("errbar").style.display = "none"; }
 function randSeed() { return Math.floor(Math.random() * 2147483648); }
 
@@ -304,7 +307,7 @@ function buildForm(keepValues) {
           div.classList.add("filled");
           st.textContent = " ✓";
           refreshInputs(name);
-        }).catch(function () { st.textContent = " failed"; showBanner(); });
+        }).catch(function () { st.textContent = " failed"; showBanner("Upload failed — try again."); });
       };
       fr.readAsArrayBuffer(file.files[0]);
     };
@@ -424,21 +427,20 @@ function startJob(wf) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workflow: wfid, params: params })
   }).then(function (r) {
-    if (r.status === 400) {
-      return r.json().then(function (data) {
+    if (!r.ok) {
+      return r.json().catch(function () { return {}; }).then(function (data) {
         setRunning(false);
-        document.getElementById("statusLine").textContent = data.error || "bad request";
+        document.getElementById("statusLine").textContent = data.error || ("Request failed (HTTP " + r.status + ")");
         return null;
       });
     }
-    if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   }).then(function (q) {
     if (!q) return;
     pollStatus(q.prompt_id, wfid, params);
   }).catch(function () {
     setRunning(false);
-    showBanner();
+    showBanner("Studio server unreachable — is it running? Retry.");
   });
 }
 
@@ -518,7 +520,7 @@ function pollStatus(pid, wfid, params) {
       setRunning(false);
       document.getElementById("statusLine").textContent = "Lost connection to ComfyUI — press Generate to retry";
       document.getElementById("etaLine").textContent = "";
-      showBanner();
+      showBanner("Lost connection — press Generate to retry.");
     });
   }, 2000);
 }
@@ -633,7 +635,7 @@ function loadWorkflows() {
     d.style.cssText = "font-size:13px;padding:8px";
     d.textContent = "Could not load workflows";
     box.appendChild(d);
-    showBanner();
+    showBanner("Studio server unreachable — is it running? Retry.");
   });
 }
 
@@ -651,7 +653,7 @@ function checkHealth() {
   }).catch(function () {
     document.getElementById("dot").classList.add("bad");
     document.getElementById("connText").textContent = "studio server unreachable";
-    showBanner();
+    showBanner("Studio server unreachable — is it running? Retry.");
   });
 }
 

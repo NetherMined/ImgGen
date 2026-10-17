@@ -588,6 +588,38 @@ class Handler(BaseHTTPRequestHandler):
                         resp = json.loads(r.read())
                     except (ValueError, UnicodeDecodeError):
                         return self._json({"error": "ComfyUI returned invalid response."}, 502)
+            except urllib.error.HTTPError as e:
+                # ComfyUI refused the prompt before queueing it (usually node
+                # validation); surface the real reason instead of "not running".
+                msg = "ComfyUI rejected the workflow."
+                try:
+                    info = json.loads(e.read().decode("utf-8", "replace"))
+                    err = info.get("error") or {}
+                    parts = []
+                    detail = str(err.get("details") or "").strip()
+                    if detail:
+                        parts.append(detail)
+                    for nid, ninfo in (info.get("node_errors") or {}).items():
+                        ctype = str(ninfo.get("class_type") or "?")
+                        for ne in ninfo.get("errors") or []:
+                            m = str(ne.get("message") or ne.get("type") or "").strip()
+                            d = str(ne.get("details") or "").strip()
+                            if d and m and d not in m:
+                                m = m + ": " + d
+                            elif d and not m:
+                                m = d
+                            if m:
+                                parts.append(ctype + " " + str(nid) + ": " + m)
+                    text = "; ".join(parts)
+                    if not text and err.get("message"):
+                        text = str(err["message"])
+                    if text:
+                        msg = "ComfyUI rejected the workflow. " + text
+                    if len(msg) > 400:
+                        msg = msg[:397] + "..."
+                except Exception:
+                    pass
+                return self._json({"error": msg}, 400)
             except urllib.error.URLError:
                 return self._json({"error": "ComfyUI not running. Start it with start_server.bat, then retry."}, 502)
             except OSError:
