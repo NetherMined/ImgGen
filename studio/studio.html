@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ImGen Studio</title>
+<style>
+  * { box-sizing: border-box; font-family: "Segoe UI", Arial, sans-serif; }
+  body { margin: 0; background: #14161a; color: #e8e8e8; }
+  header { padding: 12px 20px; background: #1d2026; border-bottom: 1px solid #333; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #4caf50; display: inline-block; }
+  #errbar { display: none; background: #a02020; color: #fff; text-align: center; padding: 8px; font-size: 13px; }
+  #errbar button { margin-left: 12px; padding: 4px 14px; cursor: pointer; }
+  .layout { display: grid; grid-template-columns: 260px 1fr 320px; gap: 12px; padding: 12px; min-height: calc(100vh - 140px); }
+  .panel { background: #1d2026; border: 1px solid #333; border-radius: 8px; padding: 12px; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; color: #999; margin: 0 0 10px; }
+  .wf-card { background: #262a31; border: 1px solid #444; border-radius: 6px; padding: 10px; margin-bottom: 8px; cursor: pointer; }
+  .wf-card:hover { border-color: #666; }
+  .wf-card.active { border-color: #4da3ff; background: #25303d; }
+  .wf-card b { font-size: 14px; }
+  .wf-card p { font-size: 12px; color: #aaa; margin: 4px 0 0; }
+  label { display: block; font-size: 12px; color: #aaa; margin: 12px 0 4px; }
+  textarea, input[type=text], input[type=number] { width: 100%; background: #101215; color: #eee; border: 1px solid #444; border-radius: 6px; padding: 8px; }
+  textarea { height: 90px; resize: vertical; }
+  input[type=range] { width: 100%; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row .val { min-width: 44px; text-align: right; font-size: 13px; color: #4da3ff; }
+  .upload { border: 2px dashed #555; border-radius: 6px; padding: 12px; text-align: center; color: #888; font-size: 13px; margin-top: 4px; }
+  .upload.filled { border-style: solid; border-color: #4caf50; color: #cfc; }
+  .upload.missing { border-color: #e53e3e; color: #fcc; }
+  .upload .ustatus { margin-left: 8px; }
+  .upload button { margin-left: 8px; padding: 4px 12px; cursor: pointer; }
+  .gen-btn { width: 100%; margin-top: 16px; padding: 12px; font-size: 16px; background: #2b6cb0; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+  .gen-btn:hover { background: #3580cc; }
+  .gen-btn:disabled { background: #555; cursor: default; }
+  .progress-wrap { background: #101215; border-radius: 6px; padding: 12px; }
+  .bar { height: 14px; background: #333; border-radius: 7px; overflow: hidden; margin: 8px 0; }
+  .bar > div { height: 100%; width: 0%; background: #4da3ff; transition: width 0.5s; }
+  .result { margin-top: 12px; background: #101215; border-radius: 6px; min-height: 220px; display: flex; align-items: center; justify-content: center; color: #666; font-size: 13px; overflow: hidden; }
+  .result img, .result video { max-width: 100%; max-height: 480px; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 0 12px 12px; }
+  .gitem { background: #262a31; border: 1px solid #444; border-radius: 6px; min-height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #666; font-size: 12px; cursor: pointer; overflow: hidden; padding: 4px; }
+  .gitem:hover { border-color: #4da3ff; }
+  .gitem img { max-width: 100%; max-height: 90px; }
+  .seed-row { display: flex; gap: 8px; }
+  .seed-row input { flex: 1; }
+  .seed-row button { background: #333; color: #fff; border: 1px solid #555; border-radius: 6px; padding: 0 14px; cursor: pointer; font-size: 18px; }
+  .help { font-size: 11px; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header><span class="dot"></span><h1>ImGen Studio</h1><span style="color:#888;font-size:13px">ComfyUI connected :8188</span></header>
+<div id="errbar"><span>ComfyUI or Studio server not running &mdash; run start_server.bat (and studio server), then Retry</span><button id="retryBtn">Retry</button></div>
+
+<div class="layout">
+  <div class="panel">
+    <h2>Workflows</h2>
+    <div id="cards">
+      <div class="wf-card" data-wf="01"><b>01 · Outfit change</b><p>Same pose and face, new outfit</p></div>
+      <div class="wf-card" data-wf="02"><b>02 · Pose change</b><p>New pose via pose reference</p></div>
+      <div class="wf-card" data-wf="03"><b>03 · Photo to video</b><p>LTX-Video, 97 frames (~4s), recommended</p></div>
+      <div class="wf-card" data-wf="04"><b>04 · AnimateDiff clip</b><p>Short prompt-driven motion, 16 frames</p></div>
+      <div class="wf-card" data-wf="05"><b>05 · Couple still</b><p>Two photos become one couple scene</p></div>
+      <div class="wf-card" data-wf="06"><b>06 · Couple video</b><p>Still becomes a kissing-motion clip</p></div>
+      <div class="wf-card" data-wf="07"><b>07 · Prompt to image</b><p>Pure text-to-image, no photo needed</p></div>
+      <div class="wf-card" data-wf="09"><b>09 · Pose preset</b><p>Your photo, a chosen preset pose, face locked</p></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2 id="formTitle">Settings</h2>
+    <label id="promptLab">Prompt</label>
+    <textarea id="prompt" placeholder=""></textarea>
+    <div id="uploads"></div>
+    <div id="seedWrap"><label>Seed</label>
+    <div class="seed-row"><input id="seed" type="number" min="0" max="2147483647" value="123456"><button id="dice" title="randomize">&#127922;</button></div></div>
+    <div id="sliders"></div>
+    <button class="gen-btn" id="genBtn">Generate</button>
+  </div>
+
+  <div class="panel">
+    <h2>Progress / result</h2>
+    <div class="progress-wrap">
+      <div style="font-size:13px" id="statusLine">Idle — pick a workflow and press Generate.</div>
+      <div class="bar"><div id="barFill"></div></div>
+      <div style="font-size:12px;color:#888" id="etaLine"></div>
+    </div>
+    <div class="result" id="result">[ finished image / video appears here ]</div>
+  </div>
+</div>
+
+<div class="panel" style="margin:0 12px 12px">
+  <h2>Gallery — past outputs (click to reload its settings)</h2>
+  <div class="gallery" id="gallery"></div>
+</div>
+
+<script>
+var workflows = [];
+var selected = null;
+var pollTimer = null;
+var POSES_CACHE = null;
+
+var PLACEHOLDERS = {
+  "01": "describe the new outfit\u2026",
+  "02": "describe the new pose and outfit\u2026",
+  "03": "describe the motion\u2026",
+  "04": "describe the motion\u2026",
+  "05": "describe the couple scene and position\u2026",
+  "06": "describe the kissing motion\u2026",
+  "07": "describe the whole image\u2026",
+  "10": "describe the full image - outfit, setting...",
+  "11": "no prompt needed - swap uses your images",
+  "12": "describe the skin/body to paint...",
+  "09": "describe the outfit and scene\u2026"
+};
+
+// Per-workflow time estimates in seconds (images 60s, video 300s).
+var ESTIMATES = { "01": 60, "02": 60, "03": 300, "04": 300, "05": 60, "06": 300, "07": 60, "09": 60, "10": 60, "11": 60, "12": 60 };
+
+// Slider specs per workflow: [paramName, label, min, max, step, default].
+var SLIDERS = {
+  "01": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.55],
+         ["face_weight", "Face-lock weight", 0.3, 1.0, 0.05, 0.7],
+         ["steps", "Steps", 10, 50, 1, 30]],
+  "02": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.6],
+         ["face_weight", "Face-lock weight", 0.3, 1.0, 0.05, 0.65],
+         ["steps", "Steps", 10, 50, 1, 30]],
+  "03": [["steps", "Steps", 10, 50, 1, 12]],
+  "04": [["steps", "Steps", 10, 50, 1, 25]],
+  "05": [["face_weight", "Face-lock weight", 0.3, 1.0, 0.05, 0.75],
+         ["face_weight_2", "Face-lock weight 2", 0.3, 1.0, 0.05, 0.75],
+         ["steps", "Steps", 10, 50, 1, 30]],
+  "06": [["steps", "Steps", 10, 50, 1, 12]],
+  "07": [["steps", "Steps", 10, 50, 1, 30]],
+  "09": [["denoise", "Denoise", 0.3, 0.8, 0.05, 0.6],
+         ["face_weight", "Face-lock weight", 0.3, 1.0, 0.05, 0.65],
+         ["steps", "Steps", 10, 50, 1, 30]],
+  "10": [["face_weight", "Face-lock weight", 0.3, 1.0, 0.05, 0.85],
+         ["steps", "Steps", 10, 50, 1, 30]],
+  "12": [["steps", "Steps", 10, 50, 1, 30]]
+};
+
+function showBanner() { document.getElementById("errbar").style.display = "block"; }
+function hideBanner() { document.getElementById("errbar").style.display = "none"; }
+
+function randSeed() { return Math.floor(Math.random() * 2147483648); }
+
+function getWorkflow(id) {
+  for (var i = 0; i < workflows.length; i++) {
+    if (workflows[i].id === id) return workflows[i];
+  }
+  return null;
+}
+
+function renderCards() {
+  var box = document.getElementById("cards");
+  box.innerHTML = "";
+  workflows.forEach(function (wf) {
+    var d = document.createElement("div");
+    d.className = "wf-card" + (selected === wf.id ? " active" : "");
+    d.setAttribute("data-wf", wf.id);
+    var b = document.createElement("b");
+    b.textContent = wf.title;
+    var p = document.createElement("p");
+    p.textContent = wf.desc;
+    d.appendChild(b);
+    d.appendChild(p);
+    d.onclick = function () { selectWorkflow(wf.id); };
+    box.appendChild(d);
+  });
+}
+
+function makeHelp(text) {
+  if (!text) return document.createTextNode("");
+  var d = document.createElement("div");
+  d.className = "help";
+  d.textContent = text;
+  return d;
+}
+
+function sliderRow(spec, helpText) {
+  var name = spec[0], label = spec[1], min = spec[2], max = spec[3], step = spec[4], def = spec[5];
+  var lab = document.createElement("label");
+  lab.textContent = label + " \u2014 ";
+  var span = document.createElement("span");
+  span.style.color = "#4da3ff";
+  span.textContent = def;
+  lab.appendChild(span);
+  var row = document.createElement("div");
+  row.className = "row";
+  var input = document.createElement("input");
+  input.type = "range";
+  input.min = min; input.max = max; input.step = step; input.value = def;
+  input.id = "sl_" + name;
+  var val = document.createElement("span");
+  val.className = "val";
+  val.textContent = def;
+  input.oninput = function () { span.textContent = input.value; val.textContent = input.value; };
+  row.appendChild(input);
+  row.appendChild(val);
+  var wrap = document.createElement("div");
+  wrap.appendChild(lab);
+  wrap.appendChild(row);
+  wrap.appendChild(makeHelp(helpText));
+  return wrap;
+}
+
+function buildForm(keepValues) {
+  var wf = getWorkflow(selected);
+  if (!wf) return;
+  var saved = keepValues || {};
+  document.getElementById("formTitle").textContent = wf.title + " \u2014 settings";
+  var noPS = (wf.id === "11"); // 11 takes images only — no prompt/seed params
+  document.getElementById("promptLab").style.display = noPS ? "none" : "";
+  document.getElementById("prompt").style.display = noPS ? "none" : "";
+  document.getElementById("seedWrap").style.display = noPS ? "none" : "";
+  var ta = document.getElementById("prompt");
+  ta.value = saved.prompt !== undefined ? saved.prompt : "";
+  ta.placeholder = PLACEHOLDERS[wf.id] || "describe the image\u2026";
+  var ph = wf.params_help || {};
+  var oldPh = document.getElementById("promptHelp");
+  if (oldPh) oldPh.remove();
+  var promptHelp = document.createElement("div");
+  promptHelp.className = "help";
+  promptHelp.id = "promptHelp";
+  if (ph.prompt) {
+    promptHelp.textContent = ph.prompt;
+    ta.after(promptHelp);
+  }
+  // Upload slots: only this workflow's uploads list.
+  var up = document.getElementById("uploads");
+  up.innerHTML = "";
+  (wf.uploads || []).forEach(function (name) {
+    var lab = document.createElement("label");
+    lab.textContent = name;
+    up.appendChild(lab);
+    var div = document.createElement("div");
+    div.className = "upload";
+    div.setAttribute("data-upload", name);
+    div.textContent = name + " \u2014 choose file, then Upload";
+    var file = document.createElement("input");
+    file.type = "file";
+    file.style.display = "block";
+    file.style.margin = "8px auto 0";
+    var btn = document.createElement("button");
+    btn.textContent = "Upload";
+    var st = document.createElement("span");
+    st.className = "ustatus";
+    btn.onclick = function () {
+      if (!file.files.length) { st.textContent = " pick a file first"; return; }
+      st.textContent = " uploading\u2026";
+      var fr = new FileReader();
+      fr.onload = function () {
+        fetch("/api/upload?name=" + encodeURIComponent(name), {
+          method: "POST",
+          headers: { "Content-Type": "application/octet-stream" },
+          body: fr.result
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function () {
+          div.classList.add("filled");
+          st.textContent = " \u2713 uploaded";
+        }).catch(function () {
+          st.textContent = " upload failed";
+          showBanner();
+        });
+      };
+      fr.readAsArrayBuffer(file.files[0]);
+    };
+    div.appendChild(document.createElement("br"));
+    div.appendChild(file);
+    div.appendChild(btn);
+    div.appendChild(st);
+    up.appendChild(div);
+    up.appendChild(makeHelp(ph.uploads));
+  });
+  // Pose preset dropdown for workflow 09 (replaces any pose upload slot).
+  if (wf.id === "09") {
+    var poseLab = document.createElement("label");
+    poseLab.textContent = "Pose preset";
+    up.appendChild(poseLab);
+    var sel = document.createElement("select");
+    sel.id = "poseSel";
+    sel.style.cssText = "width:100%;background:#101215;color:#eee;border:1px solid #444;border-radius:6px;padding:8px;";
+    up.appendChild(sel);
+    var fillPoses = function (list, keep) {
+      sel.innerHTML = "";
+      (list || []).forEach(function (p) {
+        var o = document.createElement("option");
+        o.value = p;
+        o.textContent = p.replace(/_/g, " ");
+        sel.appendChild(o);
+      });
+      if (keep && list && list.indexOf(keep) !== -1) sel.value = keep;
+    };
+    fillPoses(POSES_CACHE && POSES_CACHE.length ? POSES_CACHE : (wf.presets || []), saved.pose);
+    fetch("/api/poses").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (data) {
+      POSES_CACHE = data.poses || [];
+      var cur = document.getElementById("poseSel");
+      if (cur) fillPoses(POSES_CACHE.length ? POSES_CACHE : (wf.presets || []), cur.value);
+    }).catch(function () {});
+  }
+  // Seed.
+  document.getElementById("seed").value = saved.seed !== undefined ? saved.seed : randSeed();
+  var oldSh = document.getElementById("seedHelp");
+  if (oldSh) oldSh.remove();
+  if (ph.seed) {
+    var seedHelp = document.createElement("div");
+    seedHelp.className = "help";
+    seedHelp.id = "seedHelp";
+    seedHelp.textContent = ph.seed;
+    var seedRow = document.querySelector(".seed-row");
+    if (seedRow) seedRow.after(seedHelp);
+  }
+  // Sliders: only params the backend PARAMS map defines for this workflow.
+  var sl = document.getElementById("sliders");
+  sl.innerHTML = "";
+  (SLIDERS[wf.id] || []).forEach(function (spec) {
+    sl.appendChild(sliderRow(spec, ph[spec[0]]));
+  });
+  // Restore saved slider values (gallery click).
+  Object.keys(saved).forEach(function (k) {
+    var el = document.getElementById("sl_" + k);
+    if (el) {
+      el.value = saved[k];
+      el.dispatchEvent(new Event("input"));
+    }
+  });
+}
+
+function selectWorkflow(id) {
+  selected = id;
+  renderCards();
+  buildForm();
+}
+
+function collectParams() {
+  var p = {
+    prompt: document.getElementById("prompt").value,
+    seed: parseInt(document.getElementById("seed").value, 10) || 0,
+    steps: parseInt((document.getElementById("sl_steps") || {}).value || "30", 10)
+  };
+  ["denoise", "face_weight", "face_weight_2"].forEach(function (k) {
+    var el = document.getElementById("sl_" + k);
+    if (el) p[k] = parseFloat(el.value);
+  });
+  var poseEl = document.getElementById("poseSel");
+  if (poseEl && poseEl.value) p.pose = poseEl.value;
+  return p;
+}
+
+function setRunning(running) {
+  document.getElementById("genBtn").disabled = running;
+}
+
+function doGenerate() {
+  if (!selected || pollTimer) return;
+  var params = collectParams();
+  var wfid = selected;
+  setRunning(true);
+  document.getElementById("barFill").style.width = "2%";
+  document.getElementById("statusLine").textContent = "Queued\u2026";
+  document.getElementById("etaLine").textContent = "";
+  document.getElementById("result").textContent = "";
+  fetch("/api/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workflow: wfid, params: params })
+  }).then(function (r) {
+    if (r.status === 400) {
+      return r.json().then(function (data) {
+        setRunning(false);
+        if (data && data.missing) {
+          document.getElementById("statusLine").textContent = data.error || ("missing inputs: " + data.missing.join(", "));
+          data.missing.forEach(function (name) {
+            var el = document.querySelector('[data-upload="' + name + '"]');
+            if (el) el.classList.add("missing");
+          });
+        } else {
+          showBanner();
+        }
+        return null;
+      });
+    }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (q) {
+    if (!q) return;
+    pollStatus(q.prompt_id, wfid, params, Date.now());
+  }).catch(function () {
+    setRunning(false);
+    showBanner();
+  });
+}
+
+function pollStatus(pid, wfid, params, t0) {
+  var est = ESTIMATES[wfid] || 60;
+  pollTimer = setInterval(function () {
+    fetch("/api/status/" + encodeURIComponent(pid)).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (st) {
+      var elapsed = (Date.now() - t0) / 1000;
+      var pct = Math.min(99, Math.round(elapsed / est * 100));
+      document.getElementById("barFill").style.width = pct + "%";
+      document.getElementById("statusLine").textContent = "Running\u2026 " + pct + "%";
+      var remain = Math.max(0, Math.round(est - elapsed));
+      document.getElementById("etaLine").textContent = "~" + remain + "s remaining \u00b7 estimate";
+      if (st.failed) {
+        clearInterval(pollTimer); pollTimer = null;
+        setRunning(false);
+        document.getElementById("statusLine").textContent = "Failed";
+        document.getElementById("result").textContent = st.error || "generation failed (settings kept)";
+        return;
+      }
+      if (st.completed) {
+        clearInterval(pollTimer); pollTimer = null;
+        setRunning(false);
+        document.getElementById("barFill").style.width = "100%";
+        document.getElementById("statusLine").textContent = "Done";
+        document.getElementById("etaLine").textContent = "";
+        showResult(st.outputs || []);
+        var first = (st.outputs || [])[0] || "";
+        fetch("/api/gallery", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ file: first, workflow: wfid, params: params, prompt_id: pid })
+        }).then(loadGallery).catch(function () {});
+      }
+    }).catch(function () {
+      clearInterval(pollTimer); pollTimer = null;
+      setRunning(false);
+      showBanner();
+    });
+  }, 2000);
+}
+
+function showResult(files) {
+  var box = document.getElementById("result");
+  box.innerHTML = "";
+  if (!files.length) { box.textContent = "[ no output files ]"; return; }
+  files.forEach(function (fn) {
+    var url = "/outputs/" + encodeURIComponent(fn);
+    var el;
+    if (/\.png$/i.test(fn)) { el = document.createElement("img"); el.src = url; }
+    else if (/\.mp4$/i.test(fn)) { el = document.createElement("video"); el.src = url; el.controls = true; }
+    else { el = document.createElement("div"); el.textContent = fn; }
+    box.appendChild(el);
+  });
+}
+
+function loadGallery() {
+  fetch("/api/gallery").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (g) {
+    var box = document.getElementById("gallery");
+    box.innerHTML = "";
+    (g.items || []).forEach(function (entry) {
+      var d = document.createElement("div");
+      d.className = "gitem";
+      var fn = entry.file || "";
+      if (/\.png$/i.test(fn)) {
+        var img = document.createElement("img");
+        img.src = "/outputs/" + encodeURIComponent(fn);
+        d.appendChild(img);
+      } else if (/\.mp4$/i.test(fn)) {
+        var tag = document.createElement("div");
+        tag.textContent = "[video] " + fn;
+        d.appendChild(tag);
+      } else {
+        var other = document.createElement("div");
+        other.textContent = fn || "(no file)";
+        d.appendChild(other);
+      }
+      var meta = document.createElement("div");
+      meta.textContent = (entry.workflow || "?") + " \u00b7 seed " + ((entry.params || {}).seed !== undefined ? entry.params.seed : "?");
+      d.appendChild(meta);
+      d.onclick = function () {
+        selected = entry.workflow;
+        renderCards();
+        buildForm(entry.params || {});
+      };
+      box.appendChild(d);
+    });
+  }).catch(function () { showBanner(); });
+}
+
+function init() {
+  hideBanner();
+  fetch("/api/poses").then(function (r) {
+    return r.json();
+  }).then(function (data) {
+    POSES_CACHE = data.poses || [];
+  }).catch(function () {});
+  document.getElementById("dice").onclick = function () {
+    document.getElementById("seed").value = randSeed();
+  };
+  document.getElementById("genBtn").onclick = doGenerate;
+  document.getElementById("retryBtn").onclick = init;
+  fetch("/api/workflows").then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (data) {
+    hideBanner();
+    workflows = data.workflows;
+    renderCards();
+    if (!selected && workflows.length) selectWorkflow(workflows[0].id);
+    loadGallery();
+  }).catch(function () { showBanner(); });
+}
+
+init();
+</script>
+</body>
+</html>

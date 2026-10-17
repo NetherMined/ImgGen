@@ -1,0 +1,1 @@
+{"70":{"class_type":"LoadImage","inputs":{"image":"pose_src_standing.png"}},"71":{"class_type":"OpenposePreprocessor","inputs":{"detect_body":"enable","detect_face":"enable","detect_hand":"enable","image":["70",0],"resolution":1024}},"72":{"class_type":"SaveImage","inputs":{"filename_prefix":"skel_standing","images":["71",0]}}}

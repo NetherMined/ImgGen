@@ -1,0 +1,23 @@
+# ---- ComfyUI portable install: models (~48 GB) + personal photos/outputs ----
+ComfyUI_windows_portable/
+ComfyUI_windows_portable_nvidia.7z
+
+# ---- Python ----
+__pycache__/
+*.pyc
+
+# ---- Model weights (never commit) ----
+*.safetensors
+*.ckpt
+*.onnx
+*.pth
+
+# ---- Personal media (photos/videos are never committed to this repo) ----
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.gif
+*.mp4
+*.webm
+*.mov
